@@ -1,0 +1,2 @@
+日志记录1：2020.2.23
+	文字高亮解决，使用html标签， res.setText(Html.fromHtml(result));来完成颜色改变，但要把/n改成<br>

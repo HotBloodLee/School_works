@@ -1,0 +1,50 @@
+日志记录1（2020.4.24）：
+	因为都是js，就直接复制到js里面，但是有点问题，就是sun.png不会固定在一个位置，和html不一样，sun会以地球为定点跟着一起转，
+	所以就把wxml里面的view给了一个背景图片，实现固定sun，但是有报错，说wxss不能加载本地资源
+	百度了一下，可以把图片转成base64格式
+	这是在线转换工具的网址：https://www.css-js.com/tools/base64.html
+	同时需要把js里面的sun替换成一个透明的图片（PS）
+	但是还有一个小缺陷，就是月球和sun是绑定的，导致月球有一个角会被sun盖住
+	至少不是特别影响观看
+
+	addItem: function (e) {
+	    let sun = "/img/sun.png"
+	    let earth = "/img/earth.png"
+	    let moon = "/img/moon.png"
+	    const ctx = wx.createCanvasContext('canvas')
+	    setInterval(function () {
+	      ctx.clearRect(0, 0, 800, 800)
+	      ctx.drawImage(sun, 120, 120, 100, 100)
+	      ctx.draw()
+
+	      ctx.save();
+	      ctx.translate(150, 150);
+	     
+	      //绘制earth轨道
+	      ctx.beginPath();
+	      ctx.strokeStyle = "rgba(255,255,0,0)";
+	      ctx.arc(0, 0, 100, 0, 2 * Math.PI)
+	      ctx.stroke()
+
+	      let time = new Date();
+
+	      ctx.rotate(2 * Math.PI / 60 * time.getSeconds() + 2 * Math.PI / 60000 * time.getMilliseconds())
+	      ctx.translate(100, 0);
+	      ctx.drawImage(earth, -12, -12)
+
+	      //绘制月球轨道
+	      ctx.beginPath();
+	      ctx.strokeStyle = "rgba(255,255,255,0)";
+	      ctx.arc(0, 0, 40, 0, 2 * Math.PI);
+	      ctx.stroke();
+
+	      //绘制月球
+	      ctx.rotate(2 * Math.PI / 6 * time.getSeconds() + 2 * Math.PI / 6000 * time.getMilliseconds());
+	      ctx.translate(40, 0);
+	      ctx.drawImage(moon, -3.5, -3.5);
+	      
+	    }, 30)
+	    
+	  }
+
+	  基本上都是共通的

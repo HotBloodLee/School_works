@@ -1,0 +1,209 @@
+日志记录1（2020.4.9）（Q_001）：
+	怎么计时：用了Thread创建一个线程来计时（Thread.sleep(1000)）
+	Q_001：后台使用的问题，要保持应用在后台可以继续长时间执行，但是这方面不太明白
+	Q_002：在线程里面直接改变TextView的值好像不行，后面看看怎么改
+	Q_003：屏幕亮着可以检测，但是要怎么监测屏幕被点击（后台运行时）
+
+	Q_001、Q_002、Q_003未解决
+
+日志记录2（2020.4.27）（Q_001、Q_002、Q_003）
+	Q_001：还没去了解程序到了后台什么时候会关掉
+
+	Q_001待解决
+	Q_002：可以使用Thread加handler来配合
+		Thread来更新时间，然后发送一个message给handler
+		handler接收到message以后，再更新UI，同时判断时间够不够，够的话就停止计时，然后叫醒
+	
+	Q_002解决
+	Q_003待解决
+
+	目前只是计时加提醒，之前的计时开始的判断还没开始
+
+	Q_001、Q_003未解决
+
+日志记录3（2020.4.28）（Q_001、Q_003）
+	关于Q_001：好像在后台只要不做太多动作就不会被关，目前先测试了十秒后提醒，在后台跑是成功的
+
+	关于屏幕是否亮着的检测（一直监测）：
+		1、创建相关的服务（manifest里面设置）
+
+			<service android:name=".PoService" />
+
+			<receiver android:name=".ScreenStatusReceiver"
+			    tools:ignore="WrongManifestParent">
+			    <intent-filter>
+				<action android:name="android.intent.action.SCREEN_OFF" />
+				<action android:name="android.intent.action.SCREEN_ON" />
+			    </intent-filter>
+			</receiver>
+
+			这两个标签都附属于application下面
+
+		2、监听系统广播
+
+			public class ScreenStatusReceiver extends BroadcastReceiver {
+			    public boolean wasScreenOn = true;
+
+			    @Override
+			    public void onReceive(final Context context, final Intent intent) {
+				if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
+				    System.out.println("黑的");
+				    wasScreenOn = false;
+				} else if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
+				    System.out.println("亮着的");
+				    wasScreenOn = true;
+				}
+			    }
+			}
+
+		这种情况下，打开应用时的屏幕亮不会被检测到，只有当打开后屏幕黑掉后又一次亮才会检测到
+
+	关于计时开始的判断：
+		
+		用到了三个数：
+			private int sec = 0;
+			private int minute = 0;
+			private int check = 0;
+			屏幕黑掉后check开始计时，当check达到10秒时开始正式计时（sec++），在正式计时
+			之前屏幕亮了，就视为没有睡着，check回0，一旦开始正式计时，就直接进行到底
+
+		两个bool：
+			private volatile boolean isCancelled = false;
+			public boolean wasScreenOn = true;
+			前者用来判断是否提醒了，后者判断屏幕状态
+
+		两个handler：
+			private Handler start;
+			private Handler stop;
+			start负责改变计时时的UI
+			stop负责改变停止时的UI
+
+		线程的结束问题：
+			百度上提供了interrupt()和退出标志两种方法，前者测试失败，反正就是线程关不掉
+			只能用退出标志，就是 boolean isCancelled
+
+	Q_003：屏幕亮解决，接下来是屏幕按下和陀螺仪
+
+	Q_003待解决
+
+日志记录4（2020。4.29）（Q_003）
+	关于线程结束的优化，原来的while循环有点繁琐（多次去判断标志），
+		public void run() {
+                        while (true){
+                            if (isStopThread){
+                                break;
+                            }
+                            System.out.println(i++);
+                            SystemClock.sleep(1000);
+                        }
+                    }
+		    这样子只需要设置点击按钮创建一个新的线程即可，可以避免多按导致两个线程重复
+
+	屏幕按下的监听：
+		private void touchListen(){
+			ConstraintLayout linearLayout = (ConstraintLayout) super.findViewById(R.id.LinearLayout1);
+			linearLayout.setOnTouchListener(new View.OnTouchListener() {
+
+			    @Override
+			    public boolean onTouch(View v, MotionEvent event) {
+				// TODO Auto-generated method stub
+				switch(event.getAction()){
+				    case MotionEvent.ACTION_DOWN:
+					touch_check = 0;
+					break;
+				}
+				return true;
+			    }
+			});
+		    }
+		就是把应用的ConstraintLayout层取出来，添加一个监听器OnTouchListener，符合按下MotionEvent.ACTION_DOWN即可
+
+	陀螺仪：
+		https://blog.csdn.net/qq_35834055/article/details/71170879
+		这里面有详细的说明，包含源码以及为什么要这样写
+
+		修改了之后：
+			项目设置（manifest里面）
+				<uses-feature
+				    android:name="android.hardware.sensor.proximity"
+				    android:required="true"/>
+				<uses-feature
+				    android:name="android.hardware.sensor.gyroscope"
+				    android:required="true"/>
+					这两个标签附属于<mainfest>
+
+			获取陀螺仪：
+				SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+
+			获取旋转矢量传感器：
+				Sensor rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+
+			注册监听器：
+				SensorEventListener rvListener = new SensorEventListener() {
+				    @Override
+				    public void onSensorChanged(SensorEvent sensorEvent) {
+
+				    	旋转矢量传感器组合由陀螺仪，加速度计和磁力计产生的原始数据，以产生四元数X，Y，Z和W分量
+					这里将四元数转换为旋转矩阵，即4x4矩阵SensorManager
+
+					float[] rotationMatrix = new float[16];
+					SensorManager.getRotationMatrixFromVector(rotationMatrix, sensorEvent.values);
+
+					旋转矩阵转换成方向阵列，指定器件沿着Z，X和Y轴的旋转，可以使用该类的getOrientation()方法
+					在调用该getOrientation()方法之前，必须重新映射旋转矩阵的坐标系。
+					更准确地说，必须旋转旋转矩阵，使新坐标系的Z轴与原始坐标系的Y轴重合。
+
+					float[] remappedRotationMatrix = new float[16];
+					SensorManager.remapCoordinateSystem(rotationMatrix,
+						SensorManager.AXIS_X,
+						SensorManager.AXIS_Z,
+						remappedRotationMatrix);
+
+					将其角度转换为度数：
+
+					float[] orientations = new float[3];
+					SensorManager.getOrientation(remappedRotationMatrix, orientations);
+					orientations[1] = (float)(Math.toDegrees(orientations[1]));
+
+					if(orientations[1] > 60 || orientations[1] < -60) {
+					    isPhoneUp = false;
+					}else{
+					    isPhoneUp = true;
+					    phone_down_check = 0;
+					}
+
+				    }
+
+				    @Override
+				    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+				    }
+
+				};
+				sensorManager.registerListener(rvListener, rotationVectorSensor, SensorManager.SENSOR_DELAY_NORMAL);
+
+				经过测试发现只有orientations[1]是判断手机是否躺着所需要的，不是唯一，主要靠它来判断
+				orientations[1]的绝对值大于70时，代表手机基本上是躺着的，可能代表睡着了
+
+	闹钟的播放：MediaPlayer
+
+	增加了两个int：
+		private int touch_check = 0;
+		private int phone_down_check = 0;
+		只要屏幕一直没有按，touch_check就加一，增加到20（每秒检测一次）说明睡着了
+		phone_down_check同理
+
+	增加了两个boolean：
+		private volatile boolean isPhoneTaked = true;
+		private volatile boolean isPhoneUp = true;
+		顾名思义，与上面两个int关联
+
+	用一个按钮来开启，重置（两个状态直接切换）：
+		开启：会创建线程，屏幕状态是一直开启的不用管，打开触碰和陀螺仪检测
+		重置：所有相关状态量重置，关闭线程
+
+	handler start负责播放音乐（只要满足条件）
+
+	Q_003解决
+
+

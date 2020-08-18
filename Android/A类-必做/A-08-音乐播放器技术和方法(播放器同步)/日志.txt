@@ -1,0 +1,95 @@
+日志记录1：（2020.3.30）（Q_001）
+	首先实现音乐播放和进度的捕捉，播放没什么困难，MediaPlayer就行，
+	Q_001：进度的捕捉首先是知道当前的进度，copy了一些跟进度条有关的东西，但调试失败了，一播放进度条就全部拉满
+	至于音频文件怎么数字化来表示，还不清楚，我傻傻的用记事本打开mp3，果真作死行为，不要模仿
+	关于MediaPlayer了解的东西太少了，只知道让他播放停止，至于对里面播放的音频的查询操作有哪些一无所知，后期学学吧
+
+	Q_001未解决
+
+日志记录2：（2020.4.1）（Q_001）
+	之前没有把进度条和歌曲的长度绑定，就是
+		main_sb.setMax(mp.getDuration());
+	这样进度条就正常了
+
+	接下来就是考虑怎么把声音弄成方便比较的形式，上学期学过数字信号处理，但是没有一点头绪，音频到数字没什么异议，但是怎么比较呢？
+	以及有些音乐在几个地方旋律都一致
+
+	有想过简化一下，比如扫二维码来同步，然后肯定二维码里面有播放进度，产生二维码时的时间信息，扫到之后呢就比较当前时间和二维码里面的时间差了几秒，补到进度里面，
+	这样来同步
+
+	决定先用Zxing来实现二维码吧，至于真正意义上的听音乐来实现同步，这个要花点时间了解一下音频方面的东西，或者找找支持这方面的插件
+
+	基本原理：
+		捕获当前的音乐进度和当前时间（毫秒/秒都行，看看误差），放入二维码，扫描到之后读取获取时间和进度，
+		先看时间差了多少，比如过了四秒，就把四秒加到进度里面，实现伪同步
+
+	Q_001解决
+
+日志记录3：（2020.4.2）（Q_002、Q_003、Q_004、Q_005）
+	重点解决了一系列问题：
+		Q_002：获取了时间和进度相关的字符串之后，怎么把字符串翻译成seekbar的东西
+			求距离二维码生成已经过了多少秒（一般两分钟之内肯定会扫的）
+				int passtime = (Integer.parseInt(time_now.substring(0,2))*3600 + Integer.valueOf(time_now.substring(3,5))*60 + Integer.valueOf(time_now.substring(6))) -
+				(Integer.valueOf(time_last.substring(0,2))*3600 + Integer.valueOf(time_last.substring(3,5))*60 + Integer.valueOf(time_last.substring(6)));
+
+			求同步后应该到的进度位置
+				获取seekbar的最大值
+				Date max_mp = new Date(mp.getDuration());
+				SimpleDateFormat sdf = new SimpleDateFormat("mm:ss");
+				String max = sdf.format(max_mp);
+				求进度
+				double progress = (Double.valueOf(time.substring(0,2))*60+Double.valueOf(time.substring(3))) / (Double.valueOf(max.substring(0,2))*60+Double.valueOf(max.substring(3)));
+				 progress = progress * main_sb.getMax();
+
+			加载进度
+				main_sb.setProgress((int)progress);
+				mp.seekTo(main_sb.getProgress());
+
+		Q_003：怎么扫码
+			这里copy了某位CSDN大佬的源码
+			链接：https://blog.csdn.net/mountain_hua/article/details/80699778
+			链接：https://blog.csdn.net/mountain_hua/article/list/2
+			代码直接copy会有一些地方需要改（老版本问题），遇到问题慢慢百度就能解决
+
+		Q_004：怎么把扫码的数据传回主界面
+			用了Intent
+			主界面里面：
+				Intent intent=new Intent();
+				intent.setClass(MainActivity.this, CaptureActivity.class);
+				startActivityForResult(intent,1);
+
+			主界面还得复写onActivityResult函数来识别传回的参数
+				 @Override
+				    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+					switch (requestCode) {
+					    case 1:
+						if (resultCode == 1) {
+
+						    String returndata = data.getStringExtra("re");
+						    Toast.makeText(MainActivity.this, returndata, Toast.LENGTH_SHORT).show();
+						    recogQRcode(returndata);
+						}
+						break;
+					    default:
+					}
+					super.onActivityResult(requestCode, resultCode, data);
+
+				    }
+				    这里一定要注意复写onActivityResult()的时候，把自己的代码放在super.onActivityResult上面，
+				    其实我也不确定，据说会有bug
+
+			子界面：
+				intent.putExtra("re",str);
+				setResult(1, intent);
+				finish();
+
+		Q_005（未解决）:播放的声音一卡一卡的，可能是mp的设置有问题，改天再弄弄
+
+	然后原来的真正听声音的方法呢，又产生了几个问题，环境噪音的影响怎么解决，每次接受的信号肯定有误差，怎么判断
+	就很可能听到的和原版都有细微差别，但差别就意味着不一样
+
+	目前基本完成伪同步，就是播放的声音有点卡
+
+	Q_002、Q_003、Q_004解决
+	Q_005未解决

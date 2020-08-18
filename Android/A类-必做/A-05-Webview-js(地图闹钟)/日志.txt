@@ -1,0 +1,126 @@
+日志记录1:2020.2.24（Q_001）
+	最开始电脑手机都必须开代理才能连接earthol，还以为要翻墙，晚上又突然可以直连了，怀疑白天服务器问题
+	无法显示网页，和之前加载网页一样情况，重启软件解决。
+	无法加载卫星地图，百度后解决。
+		添加解决代码：
+		wv1.getSettings().setJavaScriptEnabled(true);
+		wv1.getSettings().setBlockNetworkImage(false);
+		if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP){
+		    wv1.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+		}
+	无法使用js代码
+		先试用：
+			wv1.loadUrl("javascript:document.xyform.x.value=117;document.xyform.y.value=360;gotoxy();");
+		但没有效果
+			后来百度添加
+			wv1.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+			wv1.getSettings().setJavaScriptEnabled(true);
+			wv1.getSettings().setBlockNetworkImage(false);
+		仍然无果
+		最后修改wv1.setWebViewClient(new WebViewClient());
+			为
+			wv1.setWebViewClient(new WebViewClient(){
+			    @Override
+			    public void onPageFinished(WebView view, String url) {
+				view.loadUrl("javascript:document.xyform.x.value=117;document.xyform.y.value=360;gotoxy();");
+			    }
+			});
+		执行成功，加载后自动跳到117,360
+	Q_001解决
+
+日志记录2:2020.3.1（Q_002）
+	虽然可以调用gotoxy和测距的函数，但是没有找到方法在同一个网页连续实现，只能先暂时使用加载新的网页然后调用一次新的功能
+	Q_002待解决
+
+
+日志记录3:2020.3.5（Q_002、Q_003、Q_004、Q_005）
+	经过漫长的测试与百度梦游，最终解决了Q_002
+	解决方法：
+	直接使用webview.loadurl来调用js会出现网页无限刷新，于是去掉了xml里面的android:onClick="onClick_go1"
+	改为直接在java里面btn.setOnClickListener(new View.OnClickListener()添加监视器，点击自动调用js，不会重新加载
+	Q_002解决
+
+	Q_003：参考csdn的方法，新建GPStracker类实现了gps位置监视（6秒更新一次，当移动距离超过10米更新一次），可以读取当前坐标并且实时更新，
+	但是无法实现坐标是否靠近目的地的监听
+
+	Q_004：将app导出到手机上面后，虽然设置了权限以及申请，但是GPS的isProviderEnabled始终返回false
+	后来发现只是给了权限，但没有开定位服务，我真傻
+	Q_004解决
+
+	一开始获取位置坐标后输入gotoxy（），发现位置不对，搞了半天是经纬度写反了，网页中以及手机gps都是采用的WGS84坐标系，输入位置最好精确到小数点以后
+
+	Q_005：测距公式（不是网页中那个测距功能，自己弄了一个）有问题，本来打算测距来实现100米以内有提示，但是网上找了一些经纬度测距公式，误差都很大
+	好吧，我太傻，忘记了模拟器的gps是虚拟的
+	Q_005解决
+
+	Q_003待解决
+
+日志记录4:2020.3.7（Q_003、Q_006、Q_007、Q_008）
+	Q_006：使用以前的vibrate(1000)；方法会提示API26以后不用了，后改成mVibrator.vibrate(VibrationEffect.createOneShot(5000, 255));
+	当距离到一定时，手机会振动，但是实际测试中振动太微弱，一开始还没有发现他在振动，后来知道是振幅太小（振幅的取值从1到255，开255就行，不用加cancel来停止）
+	Q_006解决
+	
+	Q_007：如何播放MP3音乐，先前测试时只要再点按钮就会闪退，第一次点正常播放，后来修改成功
+		try {
+                                	AssetManager assetManager = getAssets();
+                                	MediaPlayer mediaPlayer = new MediaPlayer();
+
+			AssetFileDescriptor assetFileDescriptor = assetManager.openFd("10817.mp3");
+			mediaPlayer.reset();
+			mediaPlayer.setDataSource(assetFileDescriptor.getFileDescriptor(), assetFileDescriptor.getStartOffset(), assetFileDescriptor.getLength());
+			mediaPlayer.prepare();
+			mediaPlayer.start();
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	Q_007解决
+
+	Q_008：与最开始类似，无法显示网页地图，手机重启解决
+	Q_008解决
+
+	Q_003待解决
+
+日志记录5:2020.3.7（Q_003）
+	尝试通过LocationListener来监视位置变化，但是出现以下问题：
+		使用的更新语句是 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER,3000,2,this);
+		可以检测到位置变化，还很快，但是经纬度不会更新
+		只有重新打开应用才可以看到变化的经纬度，不重新打开就一直显示第一次的位置，但是有位置变化的提示
+	之后又做了另外一个程序来显示经纬度，并且计算与之前位置的差距，但是每次检测到变化的差距计算都为0,
+	在网上又找了另外一个经纬度查询app，发现是可以实时更新的，说明我的程序有问题，排除了移动距离小不精确的可能性
+	Q_003待解决
+
+日志记录6:2020.3.8（Q_003、Q_009）
+	我真的蠢，位置虽然变化了，但是我没有把变化后的位置信息取出来，所以经纬度不会变，每次刷新时赋值就行了，另外取消了原来的
+	自写一个GPStracker类的方案，那个自定义类我越改越乱，所有的location和listener都写在主方法之内
+	Q_003解决
+
+	Q_009：现在可以碰头闹钟，接下来主要就是实现在地图上标目的地，这个暂时还没有什么想法，想的是用gotoxy（）来标记目的地，
+	但是必须手动输入经纬度，而且怎么在webview里面放一个坐标图片也是问题，还得让标记跟着拖动一起走动，当标记到屏幕边缘怎么办
+	
+	Q_009待解决
+
+日志记录7:2020.3.9（Q_009、Q_010、Q_011、Q_012）
+	Q_010：使用matrix和onTouchListener来实现标记的出现和移动，但具体的定位点还需要琢磨
+	Q_010待解决、Q_009解决
+	
+	另外加入了新功能：输入地名，然后找到该地方
+	 wv1.loadUrl("javascript:document.citysearch.cityskey.value='" + location + "';gothere(document.citysearch.cityskey.value);");
+
+	Q_011：能够输入地名找到地方，但是还没有找到方法去获取改地点的坐标，好像网页中也没有提供点击某处获取经纬度的功能，看源代码
+	也没有发现返回经纬度的地方，现在初步打算去找源代码中关于gothere（）函数里面是否有调用gotoxy（），因为他可以直接显示该地点
+	但是如果找到了要怎么取出来，问题很大
+
+	此外还加入了模式变换：1代表碰头模式，-1代表单纯的地图浏览模式
+
+	Q_010待解决、Q_011待解决
+
+	Q_012：拖动标记十出现问题，图标可以拖动，但是地图不会动了
+
+	Q_010待解决、Q_011待解决、Q_012待解决
+	
+日志记录8：（2020.3.30）（Q_010、Q_011、Q_012）
+	一个月之后我又回来了，结果之前的文件编译全部报错，可能得重写，百度也找不到什么好方法，好像和gradle有关系，再加上之前
+	有一次为了节省c盘空间把.gradle全部搬到了d盘，可能是这个操作导致的
+
+	Q_010待解决、Q_011待解决、Q_012待解决

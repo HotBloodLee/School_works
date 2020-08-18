@@ -1,0 +1,40 @@
+日志记录1（2020.3.28）
+	前一天晚上测试了一下，连不上服务器，原作者的代理也用不了
+	第二天可以连服务器了，但测试结果一直是显示retry：只有两个原因，连不上或者返回的结果没有符合要求的
+	由于连不上一定会闪退，所以说明有网页
+
+	先改
+		String tagA="<div class=\"js-tweet-text-container\">";
+	为
+		String tagA="<body>";
+	如果有该字段，则显示sss在webview上，成功
+
+	再直接把获取的tw_page.toString()加载，显示js不可用，联想起之前做地图闹钟里面的js使用，加了语句
+		tw.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+		tw.getSettings().setJavaScriptEnabled(true);
+		tw.getSettings().setMediaPlaybackRequiresUserGesture(false);
+		tw.getSettings().setBlockNetworkImage(false);
+		tw.addJavascriptInterface(this, "fridge");
+		tw.setWebViewClient(new WebViewClient());
+	感觉多一点好，就全部加上了，没有在意每句话具体的意义
+	可以显示twitter的那只鸟，但是那只鸟加载了一会儿就说有什么问题（没看懂）
+
+	后来反复一句句的尝试，发现删去请求头的设置，
+		//conn.addRequestProperty("User-Agent","Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:56.0) Gecko/20100101 Firefox/56.0");
+	网页可以全部加载出来，这里真的很迷，但是注释了以后确实管用
+
+	然后又加上挑选推特条目的那一段，不加载网页，只加载结果，结果和最开始一样
+	推文的内容肯定是有的，可能不在原作者的js-tweet-text-container里面
+
+	后来在doInBackground(String... url)里面有一个
+		while ((line = buffer.readLine()) != null) {
+                        System.out.println(tw_page.toString().length());
+                        System.out.println(line);
+                        tw_page.append(line);
+                }
+	使用System.out.println(line);
+	看看推文的class是什么，发现全部都在class="dir-ltr" dir="ltr"里面
+
+	修改之后，顺利加载
+
+	对于原作者的js-tweet-text-container可能跟请求头有关系，请求头不同可能导致返回的源码不同（猜测）
